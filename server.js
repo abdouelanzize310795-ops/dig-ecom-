@@ -8,6 +8,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
 
 const PORT = Number(process.env.PORT) || 5173;
@@ -440,17 +441,60 @@ async function adminApi(req, res, url) {
 }
 
 /* ----------------------------------------------------------------- statique */
-function serveFile(res, base, rel, extra = {}) {
+// URL publique du site (canonical, Open Graph, sitemap). SITE_URL=https://mondomaine.com en production.
+const SITE_URL_ENV = (process.env.SITE_URL || '').replace(/\/+$/, '');
+const FORCE_HTTPS = process.env.FORCE_HTTPS === 'true';
+const isHttps = req => TRUST_PROXY && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+const siteUrl = req => {
+  if (SITE_URL_ENV) return SITE_URL_ENV;
+  const host = /^[a-z0-9.-]+(:\d+)?$/i.test(req.headers.host || '') ? req.headers.host : 'localhost';
+  return `${isHttps(req) ? 'https' : 'http'}://${host}`;
+};
+const TEXT_RE = /\.(html|css|js|json|svg|txt|xml)$/i;
+
+// Envoie du texte, compressé en gzip si le navigateur l'accepte.
+function sendText(req, res, status, body, type, extra = {}) {
+  let buf = Buffer.from(body, 'utf8');
+  const headers = { 'Content-Type': type, Vary: 'Accept-Encoding', ...extra };
+  if (buf.length > 800 && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+    buf = zlib.gzipSync(buf, { level: 6 });
+    headers['Content-Encoding'] = 'gzip';
+  }
+  headers['Content-Length'] = buf.length;
+  res.writeHead(status, { ...SEC, ...headers });
+  res.end(req.method === 'HEAD' ? undefined : buf);
+}
+
+function notFound(req, res) {
+  fs.readFile(path.join(PUBLIC, '404.html'), 'utf8', (err, html) => {
+    if (err) return send(res, 404, 'Page introuvable', { 'Content-Type': 'text/plain; charset=utf-8' });
+    sendText(req, res, 404, html.replace(/%SITE_URL%/g, siteUrl(req)), MIME['.html'], { 'Cache-Control': 'no-store' });
+  });
+}
+
+function serveFile(req, res, base, rel, extra = {}) {
   const file = path.resolve(base, '.' + path.posix.normalize('/' + rel));
   if (file !== base && !file.startsWith(base + path.sep)) return send(res, 403, 'Interdit');
   fs.stat(file, (err, st) => {
-    if (err || !st.isFile()) return send(res, 404, 'Page introuvable', { 'Content-Type': 'text/plain; charset=utf-8' });
+    if (err || !st.isFile()) return /\.[a-z0-9]+$/i.test(rel) && !/\.html$/i.test(rel)
+      ? send(res, 404, 'Introuvable', { 'Content-Type': 'text/plain; charset=utf-8' }) : notFound(req, res);
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
-    const long = /\.(webp|png|jpe?g|svg)$/i.test(file);
-    res.writeHead(200, { ...SEC, 'Content-Type': type, 'Content-Length': st.size, 'Cache-Control': long ? 'public, max-age=3600, must-revalidate' : 'no-cache', ...extra });
+    const isImg = /\.(webp|png|jpe?g|ico)$/i.test(file);
+    const cache = isImg ? 'public, max-age=3600, must-revalidate' : 'no-cache';
+    if (TEXT_RE.test(file)) {
+      return fs.readFile(file, 'utf8', (e, text) => {
+        if (e) return notFound(req, res);
+        if (file.endsWith('.html')) text = text.replace(/%SITE_URL%/g, siteUrl(req));
+        sendText(req, res, 200, text, type, { 'Cache-Control': cache, ...extra });
+      });
+    }
+    res.writeHead(200, { ...SEC, 'Content-Type': type, 'Content-Length': st.size, 'Cache-Control': cache, ...extra });
+    if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);
   });
 }
+
+const PAGES = { '/': 'index.html', '/confidentialite': 'confidentialite.html', '/conditions': 'conditions.html' };
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -458,6 +502,15 @@ const server = http.createServer(async (req, res) => {
     let pathname;
     try { pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, 'Requête invalide'); }
     url.pathname = pathname;
+
+    // HTTPS forcé derrière un proxy (FORCE_HTTPS=true + TRUST_PROXY=true) et HSTS
+    if (FORCE_HTTPS && TRUST_PROXY && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'http') {
+      const target = SITE_URL_ENV.startsWith('https://') ? SITE_URL_ENV : `https://${/^[a-z0-9.-]+(:\d+)?$/i.test(req.headers.host || '') ? req.headers.host : 'localhost'}`;
+      res.writeHead(301, { Location: target + req.url });
+      return res.end();
+    }
+    if (isHttps(req)) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
     if (pathname.startsWith('/api/')) {
       if (req.method !== 'GET') {
@@ -471,9 +524,19 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Méthode non autorisée');
-    if (pathname.startsWith('/uploads/')) return serveFile(res, UPLOADS, pathname.slice('/uploads/'.length));
-    if (pathname === '/admin' || pathname === '/admin/') return serveFile(res, PUBLIC, 'admin/index.html', { 'Cache-Control': 'no-store' });
-    return serveFile(res, PUBLIC, pathname === '/' ? 'index.html' : pathname);
+    if (pathname === '/robots.txt')
+      return sendText(req, res, 200, `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\n\nSitemap: ${siteUrl(req)}/sitemap.xml\n`, MIME['.txt'], { 'Cache-Control': 'no-cache' });
+    if (pathname === '/sitemap.xml') {
+      const base = siteUrl(req);
+      const lm = f => { try { return fs.statSync(path.join(PUBLIC, f)).mtime.toISOString().slice(0, 10); } catch { return undefined; } };
+      const urls = [['/', 'index.html', '1.0'], ['/confidentialite', 'confidentialite.html', '0.3'], ['/conditions', 'conditions.html', '0.3']]
+        .map(([u, f, pr]) => `  <url><loc>${base}${u}</loc>${lm(f) ? `<lastmod>${lm(f)}</lastmod>` : ''}<priority>${pr}</priority></url>`).join('\n');
+      return sendText(req, res, 200, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, 'application/xml; charset=utf-8', { 'Cache-Control': 'no-cache' });
+    }
+    if (pathname.startsWith('/uploads/')) return serveFile(req, res, UPLOADS, pathname.slice('/uploads/'.length));
+    if (pathname === '/admin' || pathname === '/admin/')
+      return serveFile(req, res, PUBLIC, 'admin/index.html', { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
+    return serveFile(req, res, PUBLIC, PAGES[pathname.replace(/(.)\/$/, '$1')] || pathname);
   } catch (e) {
     const code = e.code === 400 || e.code === 413 ? e.code : 500;
     if (code === 500) console.error(e);

@@ -14,6 +14,10 @@ services:
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       # À mettre à true derrière un proxy HTTPS (Nginx, Caddy, Traefik…).
       TRUST_PROXY: "${TRUST_PROXY:-false}"
+      # URL publique du site (canonical, aperçu réseaux sociaux, sitemap). Ex. https://mondomaine.com
+      SITE_URL: "${SITE_URL:-}"
+      # Redirige HTTP vers HTTPS (nécessite TRUST_PROXY=true et un proxy qui envoie X-Forwarded-Proto).
+      FORCE_HTTPS: "${FORCE_HTTPS:-false}"
     volumes:
       - site-data:/app/data
 

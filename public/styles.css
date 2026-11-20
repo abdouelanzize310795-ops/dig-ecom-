@@ -129,7 +129,7 @@ input:focus,textarea:focus{outline:2px solid var(--blue);border-color:transparen
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s,transform .6s}
 .reveal.in{opacity:1;transform:none}
 
-.wa-float{position:fixed;right:1.2rem;bottom:1.2rem;z-index:60;display:flex;align-items:center;gap:.6rem;padding:.8rem 1.1rem;border-radius:999px;background:#25d366;color:#fff;font:600 .95rem var(--font-head);box-shadow:0 10px 30px #0a0f3c55;transition:transform .2s}
+.wa-float{position:fixed;right:1.2rem;bottom:1.2rem;z-index:60;display:flex;align-items:center;gap:.6rem;padding:.8rem 1.1rem;border-radius:999px;background:#0b7d3e;color:#fff;font:600 .95rem var(--font-head);box-shadow:0 10px 30px #0a0f3c55;transition:transform .2s}
 .wa-float:hover{transform:translateY(-3px) scale(1.03)}
 
 /* formations */
@@ -228,3 +228,20 @@ input:focus,textarea:focus{outline:2px solid var(--blue);border-color:transparen
 .dlg-close{position:absolute;top:.7rem;right:.8rem;border:0;background:var(--tint);width:36px;height:36px;border-radius:50%;font-size:1.4rem;line-height:1;cursor:pointer;color:var(--ink)}
 .btn[disabled],.btn.closed{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
 .channels li{color:#fff}
+
+/* pages légales et 404 */
+.legal{padding:3.5rem 0 5rem}
+.legal h1{font-size:clamp(2rem,4vw,2.8rem);margin:0 0 .4rem}
+.legal h2{font-size:1.3rem;margin:2rem 0 .5rem;color:var(--blue)}
+.legal p,.legal li{color:var(--muted);margin-bottom:.7rem}
+.legal ul{padding-left:1.2rem;margin-bottom:.7rem}
+.legal strong{color:var(--ink)}
+.legal a{color:var(--blue);text-decoration:underline}
+.legal .updated{color:var(--muted);font-size:.9rem;margin-bottom:1.5rem}
+.legal-back{margin-top:2.5rem}
+.notfound{text-align:center;padding:5rem 0 6rem}
+.notfound .big{font:700 clamp(5rem,18vw,9rem) var(--font-head);color:var(--blue);line-height:1}
+.notfound .actions{justify-content:center}
+.legal-links{display:flex;gap:1.4rem;flex-wrap:wrap}
+.legal-links a{color:var(--muted);text-decoration:underline;font-size:.9rem}
+.legal-links a:hover{color:var(--blue)}
