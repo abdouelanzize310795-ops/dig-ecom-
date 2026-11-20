@@ -1,0 +1,21 @@
+name: dige-ecom-academy
+
+services:
+  web:
+    build: .
+    image: dige-ecom-academy
+    container_name: dige-ecom-academy
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5173}:5173"
+    environment:
+      # Mot de passe de l'administrateur, utilisé uniquement à la première création de la base.
+      # S'il est vide, un mot de passe aléatoire est écrit dans data/MOT_DE_PASSE_INITIAL.txt.
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      # À mettre à true derrière un proxy HTTPS (Nginx, Caddy, Traefik…).
+      TRUST_PROXY: "${TRUST_PROXY:-false}"
+    volumes:
+      - site-data:/app/data
+
+volumes:
+  site-data:
