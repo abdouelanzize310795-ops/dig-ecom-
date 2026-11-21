@@ -1,0 +1,13 @@
+# Production derrière un Nginx déjà installé sur le serveur (alternative à Caddy).
+# Activation : dans .env, mettre  DOMAIN=mondomaine.com  et  COMPOSE_FILE=docker-compose.yml:docker-compose.nginx.yml
+# puis :  docker compose up -d --build
+# Nginx (voir nginx/dig-ecom.conf.example) gère le domaine et le certificat HTTPS (certbot).
+services:
+  web:
+    # L'application n'est joignable que depuis le serveur : seul Nginx l'expose au public.
+    ports: !override
+      - "127.0.0.1:5173:5173"
+    environment:
+      TRUST_PROXY: "true"
+      FORCE_HTTPS: "true"
+      SITE_URL: "https://${DOMAIN:?Définissez DOMAIN dans le fichier .env (ex. DOMAIN=mondomaine.com)}"

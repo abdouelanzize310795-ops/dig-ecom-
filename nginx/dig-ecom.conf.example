@@ -1,0 +1,29 @@
+# Configuration Nginx pour Dige-e-com Academy.
+# Installation :
+#   1. Remplacez « mondomaine.com » par votre domaine :
+#        sed 's/mondomaine\.com/dig-ecom.com/g' nginx/dig-ecom.conf.example > /etc/nginx/conf.d/dig-ecom.conf
+#   2. nginx -t && systemctl reload nginx
+#   3. certbot --nginx -d mondomaine.com -d www.mondomaine.com --redirect
+#      (certbot ajoute lui-même le bloc HTTPS et la redirection HTTP -> HTTPS)
+# Les enregistrements DNS « A » de mondomaine.com et de www doivent pointer vers ce serveur avant l'étape 3.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mondomaine.com www.mondomaine.com;
+
+    # Envoi de photos depuis le back office (images jusqu'à 5 Mo, transmises en base64)
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # IP réelle du visiteur : on remplace l'en-tête (et on ne l'ajoute pas) pour qu'un client
+        # ne puisse pas falsifier son adresse et contourner les limitations de débit.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        # Protocole d'origine (http ou https) : utilisé pour la redirection HTTPS, HSTS et le cookie « Secure ».
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
