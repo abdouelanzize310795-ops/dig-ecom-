@@ -38,7 +38,34 @@ Le site est alors sur `https://mondomaine.com` et le back office sur `https://mo
 Les certificats sont dans le volume `caddy-data` : ne le supprimez pas (limites de Let's Encrypt).
 Pour rediriger aussi `www`, créez son enregistrement DNS et décommentez le bloc `www` du `Caddyfile`.
 
-## Autre proxy HTTPS (Nginx, Traefik…)
+> **Les ports 80 et 443 sont déjà utilisés par un autre serveur web (Nginx, Apache…) ?** Caddy ne pourra pas démarrer
+> (`address already in use`). Utilisez l'option Nginx ci-dessous.
+
+## Production derrière un Nginx existant
+
+Nginx gère le domaine et le certificat (certbot) et transmet le trafic à l'application, qui n'écoute qu'en local (`127.0.0.1:5173`).
+Les autres sites du serveur ne sont pas touchés.
+
+1. **DNS :** enregistrements `A` de votre domaine et de `www` vers l'IP du serveur.
+2. **`.env`** (modèle : `.env.example`, option B) :
+   ```
+   ADMIN_PASSWORD=...
+   DOMAIN=mondomaine.com
+   COMPOSE_FILE=docker-compose.yml:docker-compose.nginx.yml
+   ```
+3. **Lancer l'application :** `docker compose up -d --build`
+4. **Configuration Nginx** (remplacez `mondomaine.com` par votre domaine) :
+   ```bash
+   sed 's/mondomaine\.com/votre-domaine.com/g' nginx/dig-ecom.conf.example > /etc/nginx/conf.d/dig-ecom.conf
+   nginx -t && systemctl reload nginx
+   ```
+   Ne rechargez que si `nginx -t` réussit : une erreur coupe tous les sites du serveur.
+5. **Certificat HTTPS :** `certbot --nginx -d votre-domaine.com -d www.votre-domaine.com --redirect`
+
+Le fichier d'exemple transmet l'IP réelle du visiteur (`X-Forwarded-For`, remplacé et non ajouté pour éviter la falsification) et le protocole
+(`X-Forwarded-Proto`), et autorise l'envoi d'images jusqu'à 10 Mo.
+
+## Autre proxy HTTPS (Traefik…)
 
 Mettez `TRUST_PROXY=true` pour que les limitations de débit utilisent la vraie IP du visiteur, et faites transmettre
 `X-Forwarded-For` et `X-Forwarded-Proto: https` par le proxy (cookie de session « Secure »).
