@@ -16,7 +16,29 @@ docker compose up -d --build
 - Changez-le ensuite dans **Paramètres**.
 - Les données (base SQLite, photos téléversées) sont dans le volume Docker `site-data` : elles survivent aux mises à jour.
 
-## Derrière un proxy HTTPS (production)
+## Production avec HTTPS (Caddy)
+
+Caddy obtient et renouvelle tout seul le certificat Let's Encrypt, redirige HTTP vers HTTPS et sert en HTTP/3.
+
+1. **DNS :** créez un enregistrement `A` qui fait pointer votre domaine vers l'IP du serveur.
+2. **Pare-feu :** ouvrez les ports 80 et 443, et fermez le port 5173 (l'application n'est plus exposée au public) :
+   ```bash
+   ufw allow 80/tcp && ufw allow 443/tcp && ufw allow 443/udp && ufw delete allow 5173/tcp
+   ```
+3. **`.env`** (modèle : `.env.example`) :
+   ```
+   ADMIN_PASSWORD=...
+   DOMAIN=mondomaine.com
+   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+   ```
+4. **Lancer :** `docker compose up -d --build`
+
+Le site est alors sur `https://mondomaine.com` et le back office sur `https://mondomaine.com/admin`.
+`SITE_URL`, `TRUST_PROXY` et `FORCE_HTTPS` sont réglés automatiquement par `docker-compose.prod.yml`.
+Les certificats sont dans le volume `caddy-data` : ne le supprimez pas (limites de Let's Encrypt).
+Pour rediriger aussi `www`, créez son enregistrement DNS et décommentez le bloc `www` du `Caddyfile`.
+
+## Autre proxy HTTPS (Nginx, Traefik…)
 
 Mettez `TRUST_PROXY=true` pour que les limitations de débit utilisent la vraie IP du visiteur, et faites transmettre
 `X-Forwarded-For` et `X-Forwarded-Proto: https` par le proxy (cookie de session « Secure »).

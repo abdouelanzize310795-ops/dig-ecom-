@@ -1,0 +1,20 @@
+# Caddy : HTTPS automatique (Let's Encrypt), redirection HTTP -> HTTPS et HTTP/3.
+# Le domaine vient de la variable DOMAIN du fichier .env.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Transmet l'IP réelle et le protocole (https) à l'application, utilisés pour la
+	# limitation de débit, le cookie de session « Secure » et HSTS.
+	reverse_proxy web:5173
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# Pour rediriger aussi « www » vers le domaine principal, créez d'abord l'enregistrement DNS
+# www.mondomaine.com puis décommentez :
+# www.{$DOMAIN} {
+# 	redir https://{$DOMAIN}{uri} permanent
+# }

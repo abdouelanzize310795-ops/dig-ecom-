@@ -1,0 +1,35 @@
+# Production : Caddy sert le site en HTTPS (certificat Let's Encrypt automatique) devant l'application.
+# Activation : dans .env, mettre  DOMAIN=mondomaine.com  et  COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+# puis :  docker compose up -d --build
+services:
+  web:
+    # L'application n'est plus exposée au public : seul Caddy (ports 80/443) est joignable.
+    # Le port reste accessible en local sur le serveur, pour le diagnostic (curl http://127.0.0.1:5173).
+    ports: !override
+      - "127.0.0.1:5173:5173"
+    environment:
+      TRUST_PROXY: "true"
+      FORCE_HTTPS: "true"
+      SITE_URL: "https://${DOMAIN:?Définissez DOMAIN dans le fichier .env (ex. DOMAIN=mondomaine.com)}"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: dige-ecom-caddy
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      DOMAIN: "${DOMAIN:?Définissez DOMAIN dans le fichier .env}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # certificats : à conserver
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:
