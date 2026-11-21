@@ -21,6 +21,17 @@ docker compose up -d --build
 Mettez `TRUST_PROXY=true` pour que les limitations de débit utilisent la vraie IP du visiteur, et faites transmettre
 `X-Forwarded-For` et `X-Forwarded-Proto: https` par le proxy (cookie de session « Secure »).
 
+Variables utiles dans le fichier `.env` (à côté de `docker-compose.yml`) :
+
+| Variable | Rôle |
+|---|---|
+| `ADMIN_PASSWORD` | Mot de passe administrateur (première création de la base) |
+| `SITE_URL` | URL publique, ex. `https://mondomaine.com` : balises canonical et Open Graph, sitemap, redirection HTTPS |
+| `TRUST_PROXY` | `true` derrière un proxy HTTPS |
+| `FORCE_HTTPS` | `true` pour rediriger HTTP vers HTTPS (avec `TRUST_PROXY=true`) ; active aussi HSTS |
+
+Le site fournit `/robots.txt`, `/sitemap.xml`, une page 404, `/confidentialite` et `/conditions`.
+
 ## Sauvegarde
 
 ```bash
